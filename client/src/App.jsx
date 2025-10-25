@@ -10,6 +10,7 @@ import Favorite from './pages/Favorite'
 import { Toaster } from 'react-hot-toast'
 import { useLocation } from 'react-router-dom'
 import HeroSection from './components/HeroSection'
+import Footer from './components/Footer'
 
 const App = () => {
    const isAdminRoute = useLocation().pathname.startsWith("/admin");
@@ -25,8 +26,7 @@ const App = () => {
         <Route path="/my-bookings" element={<MyBookings />} />
         <Route path="/Favorite" element={<Favorite />} />
       </Routes>
-      {!isAdminRoute && <footer />}
-      <HeroSection />
+      {!isAdminRoute && <Footer />}
     </>
   );
 }

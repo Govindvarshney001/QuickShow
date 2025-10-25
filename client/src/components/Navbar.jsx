@@ -63,7 +63,7 @@ function Navbar() {
         >
           Releases
         </Link>
-        {/* {favoriteMovies.length > 0 && (
+        {(
           <Link
             onClick={() => {
               scrollTo(0, 0);
@@ -73,7 +73,7 @@ function Navbar() {
           >
             Favorites
           </Link>
-        )} */}
+        )}
       </div>
 
       <div className="flex items-center gap-8">
