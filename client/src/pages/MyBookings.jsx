@@ -120,7 +120,11 @@ const MyBookings = () => {
 };
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 export default MyBookings;
+=======
+export default MyBookings;
+>>>>>>> Stashed changes
 =======
 export default MyBookings;
 >>>>>>> Stashed changes
