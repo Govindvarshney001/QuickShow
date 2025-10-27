@@ -119,4 +119,8 @@ const MyBookings = () => {
   );
 };
 
+<<<<<<< Updated upstream
 export default MyBookings;
+=======
+export default MyBookings;
+>>>>>>> Stashed changes
