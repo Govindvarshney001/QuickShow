@@ -1,4 +1,4 @@
-<<<<<<< Updated upstream
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { assets, dummyDateTimeData, dummyShowsData } from "../assets/assets";
@@ -8,17 +8,6 @@ import BlurCircle from "../components/BlurCircle";
 import toast from "react-hot-toast";
 import isoTimeFormat from "../lib/isoTimeFormat";
 
-
-=======
-import React, { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { assets, dummyDateTimeData, dummyShowsData } from '../assets/assets'
-import { ArrowRightIcon, ClockIcon } from 'lucide-react'
-import isoTimeFormat from '../lib/isoTimeFormat'
-import BlurCircle from '../components/BlurCircle'
-import toast from 'react-hot-toast'
-import { useAppContext } from '../context/AppContext'
->>>>>>> Stashed changes
 
 const SeatLayout = () => {
   const groupRows = [
