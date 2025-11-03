@@ -2,15 +2,30 @@
 @import "tailwindcss";
 
 @theme{
-    --color-primary: #F84565;
-    --color-primary-dull: #D63845;
+  --color-primary: #F84565;
+  --color-primary-dull: #D63854;
 }
+
 *{
-    font-family: "Montserrat", sans-serif;
-    scrollbar-width: thin;
-    scrollbar-color: #787777 #1e1e1e;
+  font-family: "Outfit", sans-serif;
+  scrollbar-width: thin;
+  scrollbar-color: #787777 #1e1e1e;
 }
+
 body{
-    color: white;
-    background-color: #09090b;
+  color: white;
+  background-color: #09090B;
+}
+
+.no-scrollbar{
+  scrollbar-width: none;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+}
+
+::-webkit-calendar-picker-indicator {
+    filter: invert(1);
 }
