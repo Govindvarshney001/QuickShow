@@ -7,8 +7,6 @@ import BlurCircle from "../components/BlurCircle";
 import toast from "react-hot-toast";
 import isoTimeFormat from "../lib/isoTimeFormat";
 
-
-
 const SeatLayout = () => {
   const groupRows = [
     ["A", "B"],
@@ -182,7 +180,7 @@ const SeatLayout = () => {
         </div>
 
         <button
-          onClick={()=> navigate('/my-bookings')}
+          onClick={() => navigate("/my-bookings")}
           className="flex items-center gap-1 mt-20 px-10 py-3 text-sm bg-primary hover:bg-primary-dull transition rounded-full font-medium cursor-pointer active:scale-95"
         >
           Proceed to Checkout
