@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { dummyBookingData } from "../assets/assets";
+import { dummyBookingData, dummyShowsData } from "../assets/assets";
 import Loading from "../components/Loading";
 import BlurCircle from "../components/BlurCircle";
 import timeFormat from "../lib/timeFormat";
@@ -13,12 +13,62 @@ const MyBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load Dummy Bookings
+  // Load bookings from localStorage first, then merge with dummy data.
+  // Ensure the default/dummy bookings are always present (no duplicates),
+  // so a server restart or app reload still shows the default movie plus any
+  // previously added bookings saved to localStorage.
   useEffect(() => {
     setTimeout(() => {
-      setBookings(dummyBookingData);
-      setIsLoading(false);
-    }, 1000);
+      try {
+        const persistedLocal = JSON.parse(
+          localStorage.getItem("bookings") || "[]"
+        );
+        const persistedSession = JSON.parse(
+          sessionStorage.getItem("bookings") || "[]"
+        );
+        // prefer local then session (session may contain fallbacks)
+        const persisted = [...persistedLocal, ...persistedSession];
+
+        // Build a map to dedupe bookings. Use a composite key because some
+        // dummy entries may share ids in the sample data.
+        const keyFor = (b) => {
+          const showId = b?.show?._id || "";
+          const seats = Array.isArray(b.bookedSeats)
+            ? b.bookedSeats.join(",")
+            : "";
+          const amount = b.amount || 0;
+          return `${showId}::${seats}::${amount}`;
+        };
+
+        const seen = new Set();
+        const merged = [];
+
+        // Add persisted bookings first (so user-added bookings remain top)
+        for (const b of persisted) {
+          const k = keyFor(b);
+          if (!seen.has(k)) {
+            seen.add(k);
+            merged.push(b);
+          }
+        }
+
+        // Ensure each dummy booking appears at least once
+        for (const b of dummyBookingData) {
+          const k = keyFor(b);
+          if (!seen.has(k)) {
+            seen.add(k);
+            merged.push(b);
+          }
+        }
+
+        setBookings(merged);
+      } catch (err) {
+        console.error("Failed to load bookings from localStorage:", err);
+        setBookings(dummyBookingData);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 500);
   }, []);
 
   // Cancel Booking Handler
@@ -32,10 +82,101 @@ const MyBookings = () => {
     setTimeout(() => {
       toast.dismiss();
       toast.success("Booking cancelled successfully!");
-      setBookings((prev) =>
-        prev.filter((booking) => booking._id !== bookingId)
-      );
+      setBookings((prev) => {
+        const updated = prev.filter((booking) => booking._id !== bookingId);
+        try {
+          // remove from localStorage bookings
+          const persistedLocal = JSON.parse(
+            localStorage.getItem("bookings") || "[]"
+          );
+          const newPersistedLocal = persistedLocal.filter(
+            (b) => b._id !== bookingId
+          );
+          localStorage.setItem("bookings", JSON.stringify(newPersistedLocal));
+        } catch (err) {
+          console.error(
+            "Failed to update persisted bookings in localStorage",
+            err
+          );
+        }
+        try {
+          // remove from sessionStorage bookings
+          const persistedSession = JSON.parse(
+            sessionStorage.getItem("bookings") || "[]"
+          );
+          const newPersistedSession = persistedSession.filter(
+            (b) => b._id !== bookingId
+          );
+          sessionStorage.setItem(
+            "bookings",
+            JSON.stringify(newPersistedSession)
+          );
+        } catch (err) {
+          console.error(
+            "Failed to update persisted bookings in sessionStorage",
+            err
+          );
+        }
+        return updated;
+      });
     }, 800);
+  };
+
+  // Resolve poster/title/runtime for bookings that may only contain minimal movie data
+  const resolveShowMovieField = (item, field) => {
+    const bookingMovie = item?.show?.movie || null;
+    if (bookingMovie && bookingMovie[field]) return bookingMovie[field];
+
+    // try admin saved shows
+    try {
+      const admin = JSON.parse(localStorage.getItem("adminShows") || "[]");
+      // first try matching by id
+      let found = admin.find((s) => s._id === item?.show?._id);
+      if (!found && bookingMovie && bookingMovie.title) {
+        // fallback: try matching by title (some bookings may reference minimal data)
+        found = admin.find(
+          (s) =>
+            s.title === bookingMovie.title ||
+            s.title === item?.show?.movie?.title
+        );
+      }
+      if (found && found[field]) return found[field];
+    } catch (err) {
+      // ignore
+    }
+
+    // fallback to dummyShowsData
+    const dummyFoundById = dummyShowsData.find(
+      (s) => s._id === item?.show?._id
+    );
+    if (dummyFoundById && dummyFoundById[field]) return dummyFoundById[field];
+    if (bookingMovie && bookingMovie.title) {
+      const dummyFoundByTitle = dummyShowsData.find(
+        (s) => s.title === bookingMovie.title
+      );
+      if (dummyFoundByTitle && dummyFoundByTitle[field])
+        return dummyFoundByTitle[field];
+    }
+
+    return null;
+  };
+
+  // Normalize image source: accept data urls, absolute urls, or fallback to TMDB base path if needed
+  const computeImageSrc = (path) => {
+    if (!path) return null;
+    if (typeof path !== "string") return null;
+    // data URL or absolute URL
+    if (
+      path.startsWith("data:") ||
+      path.startsWith("http") ||
+      path.startsWith("//")
+    )
+      return path;
+    // support paths from TMDB (starting with /)
+    if (path.startsWith("/"))
+      return `https://image.tmdb.org/t/p/original${path}`;
+    // otherwise return as-is
+    return path;
   };
 
   if (isLoading) return <Loading />;
@@ -58,18 +199,18 @@ const MyBookings = () => {
             <div className="flex flex-col md:flex-row">
               <img
                 src={
-                  item.show?.movie?.poster_path ||
+                  resolveShowMovieField(item, "poster_path") ||
                   "https://via.placeholder.com/150"
                 }
-                alt={item.show?.movie?.title || "Movie Poster"}
+                alt={resolveShowMovieField(item, "title") || "Movie Poster"}
                 className="md:max-w-45 aspect-video h-auto object-cover object-bottom rounded"
               />
               <div className="flex flex-col p-4">
                 <p className="text-lg font-semibold">
-                  {item.show?.movie?.title || "-"}
+                  {resolveShowMovieField(item, "title") || "-"}
                 </p>
                 <p className="text-gray-400 text-sm">
-                  {timeFormat(item.show?.movie?.runtime) || "-"}
+                  {timeFormat(resolveShowMovieField(item, "runtime")) || "-"}
                 </p>
                 <p className="text-gray-400 text-sm mt-auto">
                   {dateFormat(item.show?.showDateTime) || "-"}
@@ -84,21 +225,23 @@ const MyBookings = () => {
                   {item.amount?.toLocaleString() || 0}
                 </p>
 
-                {!item.isPaid ? (
+                {/* Show Pay Now when unpaid */}
+                {!item.isPaid && (
                   <Link
-                    to={item.paymentLink || "#"}
+                    to={`/payment/${item._id}`}
                     className="bg-primary px-4 py-1.5 text-sm rounded-full font-medium cursor-pointer"
                   >
                     Pay Now
                   </Link>
-                ) : (
-                  <button
-                    onClick={() => handleCancelBooking(item._id)}
-                    className="bg-red-500/80 hover:bg-red-500 px-4 py-1.5 text-sm rounded-full font-medium cursor-pointer transition active:scale-95"
-                  >
-                    Cancel
-                  </button>
                 )}
+
+                {/* Always show Cancel so user can remove any booking */}
+                <button
+                  onClick={() => handleCancelBooking(item._id)}
+                  className="bg-red-500/80 hover:bg-red-500 px-4 py-1.5 text-sm rounded-full font-medium cursor-pointer transition active:scale-95"
+                >
+                  Cancel
+                </button>
               </div>
 
               <div className="text-sm">

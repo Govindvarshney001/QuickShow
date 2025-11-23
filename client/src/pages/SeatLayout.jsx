@@ -24,13 +24,14 @@ const SeatLayout = () => {
 
   const navigate = useNavigate();
 
-  // 🧠 Dummy getShow (no axios)
+  // 🧠 Dummy getShow (no axios) — now merges admin shows from localStorage
   const getShow = async () => {
     try {
+      const persisted = JSON.parse(localStorage.getItem("adminShows") || "[]");
+      const all = [...persisted, ...dummyShowsData];
       const showData =
-        dummyShowsData.find(
-          (item) => item._id === id || item.id?.toString() === id
-        ) || dummyShowsData[0]; // fallback
+        all.find((item) => item._id === id || item.id?.toString() === id) ||
+        all[0];
 
       if (showData) {
         setShow({
@@ -104,17 +105,155 @@ const SeatLayout = () => {
     setOccupiedSeats(seats);
   };
 
-  const bookTickets = () => {
+  const proceedToCheckout = () => {
     if (!selectedTime || !selectedSeats.length)
       return toast.error("Please select time and seats");
 
-    toast.success(
-      `Booking confirmed for ${selectedSeats.length} seat(s) at ${formatTime(
-        selectedTime.time
-      )}`
-    );
+    // Build a booking object that matches dummyBookingData shape
+    const showPrice = 59; // demo default per-seat price
+    const amount = showPrice * selectedSeats.length;
 
-    navigate("/success"); // redirect mock
+    // Build a minimal movie object to avoid storing large base64 images
+    // IMPORTANT: do NOT include poster/backdrop binary data here to avoid
+    // localStorage quota issues when admin-added movies have base64 images.
+    const minimalMovie = {
+      _id: show.movie._id,
+      title: show.movie.title,
+      runtime: show.movie.runtime,
+      vote_average: show.movie.vote_average,
+    };
+
+    const booking = {
+      _id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      user: { name: "Guest" },
+      show: {
+        _id: selectedTime.showId || `${id}-${date}-${selectedTime.time}`,
+        movie: minimalMovie,
+        showDateTime: selectedTime.time,
+        showPrice,
+      },
+      amount,
+      bookedSeats: selectedSeats,
+      isPaid: false,
+    };
+
+    // Try to create an order on the backend and launch Razorpay checkout.
+    (async () => {
+      const payload = {
+        movieId: show.movie._id,
+        movieTitle: show.movie.title,
+        seats: selectedSeats,
+        amount,
+        showDateTime: selectedTime.time,
+        showId: selectedTime.showId || `${id}-${date}-${selectedTime.time}`,
+      };
+
+      try {
+        const resp = await fetch(
+          "http://localhost:3000/api/payment/create-order",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        if (!resp.ok) throw new Error("Failed to create order on server");
+
+        const data = await resp.json();
+        const { order, provisionalId } = data;
+
+        // Load Razorpay script
+        const loadScript = (src) =>
+          new Promise((resolve) => {
+            const script = document.createElement("script");
+            script.src = src;
+            script.onload = () => resolve(true);
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+          });
+
+        const ok = await loadScript(
+          "https://checkout.razorpay.com/v1/checkout.js"
+        );
+        if (!ok) {
+          toast.error("Could not load Razorpay SDK");
+          return;
+        }
+
+        const options = {
+          key: import.meta.env.VITE_RAZORPAY_KEY_ID || "", // set VITE_RAZORPAY_KEY_ID in client/.env
+          amount: order.amount, // amount in paise from server
+          currency: order.currency || "INR",
+          name: show.movie.title,
+          description: `Booking for ${selectedSeats.length} seat(s)`,
+          order_id: order.id,
+          handler: async function (response) {
+            try {
+              // Verify payment on backend
+              const verifyResp = await fetch(
+                "http://localhost:3000/api/payment/verify-payment",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_signature: response.razorpay_signature,
+                    provisionalId,
+                  }),
+                }
+              );
+
+              const verifyData = await verifyResp.json();
+              if (!verifyResp.ok)
+                throw new Error(verifyData.message || "Verification failed");
+
+              toast.success("Payment verified and booking confirmed");
+              // Redirect to my-bookings. Server has persisted booking now.
+              navigate("/my-bookings");
+            } catch (err) {
+              console.error("Payment verification failed", err);
+              toast.error("Payment verification failed. Contact support.");
+            }
+          },
+          theme: { color: "#F43F5E" },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on("payment.failed", function (response) {
+          console.error("Payment failed", response.error);
+          toast.error("Payment failed or was cancelled");
+        });
+        rzp.open();
+      } catch (err) {
+        console.warn(
+          "Server order creation failed, falling back to local save",
+          err
+        );
+
+        // If server integration isn't available, fall back to local persistence (existing behavior)
+        try {
+          let existing = [];
+          const raw = localStorage.getItem("bookings");
+          if (raw) {
+            try {
+              existing = JSON.parse(raw) || [];
+            } catch (e) {
+              console.warn("Corrupt bookings in localStorage, resetting.", e);
+              existing = [];
+            }
+          }
+          existing.unshift(booking);
+          localStorage.setItem("bookings", JSON.stringify(existing));
+          toast.success(`Saved booking for ${selectedSeats.length} seat(s)`);
+          navigate("/my-bookings");
+        } catch (err2) {
+          console.error("Fallback save failed", err2);
+          toast.error("Could not save booking locally");
+        }
+      }
+    })();
   };
 
   useEffect(() => {
@@ -180,7 +319,7 @@ const SeatLayout = () => {
         </div>
 
         <button
-          onClick={() => navigate("/my-bookings")}
+          onClick={proceedToCheckout}
           className="flex items-center gap-1 mt-20 px-10 py-3 text-sm bg-primary hover:bg-primary-dull transition rounded-full font-medium cursor-pointer active:scale-95"
         >
           Proceed to Checkout

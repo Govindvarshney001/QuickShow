@@ -14,15 +14,41 @@ function MovieDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [show, setShow] = useState(null);
-  const [favoriteMovies, setFavoriteMovies] = useState([]);
+  const [favoriteMovies, setFavoriteMovies] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("favorites") || "[]");
+    } catch (err) {
+      return [];
+    }
+  });
   const [isTrailerOpen, setIsTrailerOpen] = useState(false);
 
-  const shows = dummyShowsData;
+  const [shows, setShows] = useState([]);
+
+  // 🔹 Fetch merged shows (persisted admin shows + dummy)
+  const loadShows = () => {
+    try {
+      const persisted = JSON.parse(localStorage.getItem("adminShows") || "[]");
+      const map = new Map();
+      const merged = [];
+      for (const s of [...persisted, ...dummyShowsData]) {
+        if (!map.has(s._id)) {
+          map.set(s._id, true);
+          merged.push(s);
+        }
+      }
+      setShows(merged);
+    } catch (err) {
+      console.error("Failed to load shows:", err);
+      setShows(dummyShowsData);
+    }
+  };
 
   // 🔹 Fetch show by id
   const getShow = async () => {
-    const showData = dummyShowsData.find(
-      (show) => show._id === id || show.id.toString() === id
+    const allShows = shows.length > 0 ? shows : dummyShowsData;
+    const showData = allShows.find(
+      (show) => show._id === id || show.id?.toString() === id
     );
     if (showData) {
       setShow({
@@ -33,21 +59,39 @@ function MovieDetails() {
   };
 
   useEffect(() => {
-    getShow();
-  }, [id]);
+    loadShows();
+  }, []);
 
-  // 🔹 Favorite toggle
+  useEffect(() => {
+    getShow();
+  }, [id, shows]);
+
+  // 🔹 Favorite toggle (persisted to localStorage)
   const handleFavorite = () => {
-    const isFavorite = favoriteMovies.find((movie) => movie._id === id);
-    if (isFavorite) {
-      setFavoriteMovies(favoriteMovies.filter((movie) => movie._id !== id));
+    if (!show || !show.movie) return;
+    const movie = show.movie;
+    const exists = favoriteMovies.find((m) => m._id === movie._id);
+    let updated;
+    if (exists) {
+      updated = favoriteMovies.filter((m) => m._id !== movie._id);
+      setFavoriteMovies(updated);
+      try {
+        localStorage.setItem("favorites", JSON.stringify(updated));
+      } catch (err) {
+        console.error("Failed to persist favorites:", err);
+      }
     } else {
-      setFavoriteMovies([...favoriteMovies, show.movie]);
+      updated = [...favoriteMovies, movie];
+      setFavoriteMovies(updated);
+      try {
+        localStorage.setItem("favorites", JSON.stringify(updated));
+      } catch (err) {
+        console.error("Failed to persist favorites:", err);
+      }
     }
   };
 
-  if (!show)
-    return <Loading />;
+  if (!show) return <Loading />;
 
   return (
     <div className="px-6 md:px-16 lg:px-40 pt-30 md:pt-50 relative">
@@ -132,7 +176,7 @@ function MovieDetails() {
             >
               <Heart
                 className={`w-5 h-5 ${
-                  favoriteMovies.find((movie) => movie._id === id)
+                  favoriteMovies.find((movie) => movie._id === show.movie._id)
                     ? "fill-primary text-primary"
                     : ""
                 }`}
