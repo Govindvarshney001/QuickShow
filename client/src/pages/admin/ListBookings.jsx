@@ -3,6 +3,7 @@ import { dummyBookingData } from "../../assets/assets";
 import Loading from "../../components/Loading";
 import Title from "../../components/admin/Title";
 import { dateFormat } from "../../lib/dateFormat";
+import { useNavigate } from "react-router-dom";
 
 const ListBookings = () => {
   const currency = import.meta.env.VITE_CURRENCY || "₹";
@@ -26,6 +27,8 @@ const ListBookings = () => {
   useEffect(() => {
     getAllBookings();
   }, []);
+
+  const navigate = useNavigate();
 
   return !isLoading ? (
     <>
@@ -60,6 +63,14 @@ const ListBookings = () => {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="flex justify-end mt-3">
+        <button
+          onClick={() => navigate("/")}
+          className="px-3 py-1 rounded bg-red-800 text-white hover:bg-gray-700"
+        >
+          Home
+        </button>
       </div>
     </>
   ) : (

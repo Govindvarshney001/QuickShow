@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { CheckIcon, DeleteIcon, StarIcon } from "lucide-react";
 import Loading from "../../components/Loading";
 import Title from "../../components/admin/Title";
@@ -58,6 +59,8 @@ const AddShows = () => {
   useEffect(() => {
     fetchNowPlayingMovies();
   }, []);
+
+  const navigate = useNavigate();
 
   // helpers
   const toMinutes = (input) => {
@@ -218,6 +221,14 @@ const AddShows = () => {
   return (
     <>
       <Title text1="Add" text2="Shows" />
+      <div className="flex justify-end mt-3">
+        <button
+          onClick={() => navigate("/")}
+          className="px-3 py-1 rounded bg-red-800 text-white hover:bg-gray-700"
+        >
+          Home
+        </button>
+      </div>
 
       {/* Movies Section */}
       <p className="mt-10 text-lg font-medium">Now Playing Movies</p>
