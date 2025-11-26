@@ -6,6 +6,7 @@ import { useClerk, UserButton, useUser } from "@clerk/clerk-react";
 // import { useAppContext } from "../context/AppContext";
 
 import AdminAuthModal from "./AdminAuthModal";
+import SearchModal from "./SearchModal";
 
 function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,10 +15,17 @@ function Navbar() {
   const { user } = useUser();
   const navigate = useNavigate();
   const { openSignIn } = useClerk();
+  const [showSearch, setShowSearch] = useState(false);
 
   return (
     <div className="fixed top-0 left-0 z-50 w-full flex items-center justify-between px-6 md:px-16 1g:px-36 py-5">
-      <Link>
+      <Link
+        onClick={() => {
+          scrollTo(0, 0);
+          setIsOpen(false);
+        }}
+        to="/"
+      >
         <img src={assets.logo} className="w-36 h-auto" alt="" />
       </Link>
       <div
@@ -81,7 +89,10 @@ function Navbar() {
       </div>
 
       <div className="flex items-center gap-8">
-        <SearchIcon className="max-md:hidden w-6 h-6 cursor-pointer" />
+        <SearchIcon
+          className="max-md:hidden w-6 h-6 cursor-pointer"
+          onClick={() => setShowSearch(true)}
+        />
         {!user ? (
           <button
             onClick={openSignIn}
@@ -110,6 +121,7 @@ function Navbar() {
         open={showAdminAuth}
         onClose={() => setShowAdminAuth(false)}
       />
+      <SearchModal open={showSearch} onClose={() => setShowSearch(false)} />
     </div>
   );
 }
