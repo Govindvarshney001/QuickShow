@@ -18,7 +18,7 @@ const AddShows = () => {
   const [title, setTitle] = useState("");
   const [overview, setOverview] = useState("");
   const [trailerLink, setTrailerLink] = useState("");
-  const [voteAverage, setVoteAverage] = useState(0);
+  const [voteAverage, setVoteAverage] = useState("");
   const [runtimeInput, setRuntimeInput] = useState("");
   const [genresInput, setGenresInput] = useState("");
   const [releaseYear, setReleaseYear] = useState("");
@@ -119,7 +119,17 @@ const AddShows = () => {
     } catch (err) {
       console.error(err);
       toast.dismiss(t);
-      toast.error("Failed to upload poster");
+      // fallback: use a local data URL preview so admin can continue
+      try {
+        const data = await readFileAsDataURL(f);
+        setPosterPreview(data);
+        toast.error(
+          "Upload failed — using local preview. Configure server Cloudinary to enable uploads."
+        );
+      } catch (rerr) {
+        console.error("Failed to create local preview", rerr);
+        toast.error("Failed to upload poster");
+      }
     }
   };
 
@@ -143,18 +153,29 @@ const AddShows = () => {
     } catch (err) {
       console.error(err);
       toast.dismiss(t);
-      toast.error("Failed to upload backdrop");
+      // fallback to local data URL preview
+      try {
+        const data = await readFileAsDataURL(f);
+        setBackdropPreview(data);
+        toast.error(
+          "Upload failed — using local preview. Configure server Cloudinary to enable uploads."
+        );
+      } catch (rerr) {
+        console.error("Failed to create local backdrop preview", rerr);
+        toast.error("Failed to upload backdrop");
+      }
     }
   };
 
   const handleAddMovie = () => {
     // validation
+    const vote = Number(voteAverage);
     if (
       !posterPreview ||
       !title ||
       !overview ||
       !trailerLink ||
-      !voteAverage ||
+      voteAverage === "" ||
       !runtimeInput ||
       !genresInput ||
       !releaseYear ||
@@ -162,6 +183,12 @@ const AddShows = () => {
     ) {
       return toast.error(
         "Please fill all required fields (poster, title, description, trailer, rating, duration, genre, year, language)"
+      );
+    }
+
+    if (isNaN(vote) || vote < 0 || vote > 10) {
+      return toast.error(
+        "Please provide a valid numeric rating between 0 and 10"
       );
     }
 
@@ -202,7 +229,7 @@ const AddShows = () => {
       setTitle("");
       setOverview("");
       setTrailerLink("");
-      setVoteAverage(0);
+      setVoteAverage("");
       setRuntimeInput("");
       setGenresInput("");
       setReleaseYear("");
@@ -240,13 +267,13 @@ const AddShows = () => {
           <div className="group flex flex-wrap gap-4 mt-4 w-max">
             {nowPlayingMovies.map((movie) => (
               <div
-                key={movie.id}
+                key={movie._id || movie.id}
                 className={`relative max-w-40 cursor-pointer transition duration-300 ${
-                  selectedMovie === movie.id
+                  selectedMovie === (movie._id || movie.id)
                     ? "ring-2 ring-primary scale-105"
                     : "opacity-80 hover:opacity-100"
                 }`}
-                onClick={() => setSelectedMovie(movie.id)}
+                onClick={() => setSelectedMovie(movie._id || movie.id)}
               >
                 <div className="relative rounded-lg overflow-hidden">
                   <img
@@ -257,7 +284,10 @@ const AddShows = () => {
                   <div className="text-sm flex items-center justify-between p-2 bg-black/70 w-full absolute bottom-0 left-0">
                     <p className="flex items-center gap-1 text-gray-400">
                       <StarIcon className="w-4 h-4 text-primary fill-primary" />
-                      {movie.vote_average.toFixed(1)}
+                      {(isNaN(Number(movie.vote_average))
+                        ? 0
+                        : Number(movie.vote_average)
+                      ).toFixed(1)}
                     </p>
                     <p className="text-gray-300">
                       {kConverter(movie.vote_count)} Votes
@@ -265,7 +295,7 @@ const AddShows = () => {
                   </div>
                 </div>
 
-                {selectedMovie === movie.id && (
+                {selectedMovie === (movie._id || movie.id) && (
                   <div className="absolute top-2 right-2 flex items-center justify-center bg-primary h-6 w-6 rounded">
                     <CheckIcon
                       className="w-4 h-4 text-white"
@@ -491,7 +521,7 @@ const AddShows = () => {
               setTitle("");
               setOverview("");
               setTrailerLink("");
-              setVoteAverage(0);
+              setVoteAverage("");
               setRuntimeInput("");
               setGenresInput("");
               setReleaseYear("");
