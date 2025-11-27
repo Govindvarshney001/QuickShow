@@ -51,9 +51,29 @@ function MovieDetails() {
       (show) => show._id === id || show.id?.toString() === id
     );
     if (showData) {
+      // generate dateTime for today + next 3 days
+      const generateDateTime = (showId) => {
+        const dateObj = {};
+        const now = new Date();
+        for (let i = 0; i < 4; i++) {
+          const d = new Date(now);
+          d.setDate(now.getDate() + i);
+          // key as YYYY-MM-DD
+          const key = d.toISOString().slice(0, 10);
+          // sample show times: 10:00, 14:00, 18:00 (local time)
+          const times = [10, 14, 18].map((hour) => {
+            const t = new Date(d);
+            t.setHours(hour, 0, 0, 0);
+            return { time: t.toISOString(), showId: `${showId}-${i}-${hour}` };
+          });
+          dateObj[key] = times;
+        }
+        return dateObj;
+      };
+
       setShow({
         movie: showData,
-        dateTime: dummyDateTimeData,
+        dateTime: generateDateTime(showData._id || showData.id),
       });
     }
   };
