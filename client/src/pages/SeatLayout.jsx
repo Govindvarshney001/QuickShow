@@ -34,9 +34,30 @@ const SeatLayout = () => {
         all[0];
 
       if (showData) {
+        // generate dateTime for today + next 3 days (same format MovieDetails uses)
+        const generateDateTime = (showId) => {
+          const dateObj = {};
+          const now = new Date();
+          for (let i = 0; i < 4; i++) {
+            const d = new Date(now);
+            d.setDate(now.getDate() + i);
+            const key = d.toISOString().slice(0, 10);
+            const times = [10, 14, 18].map((hour) => {
+              const t = new Date(d);
+              t.setHours(hour, 0, 0, 0);
+              return {
+                time: t.toISOString(),
+                showId: `${showId}-${i}-${hour}`,
+              };
+            });
+            dateObj[key] = times;
+          }
+          return dateObj;
+        };
+
         setShow({
           movie: showData,
-          dateTime: dummyDateTimeData,
+          dateTime: generateDateTime(showData._id || showData.id),
         });
       }
     } catch (error) {
@@ -285,8 +306,16 @@ const SeatLayout = () => {
                     : "hover:bg-primary/20"
                 }`}
               >
-                <ClockIcon className="w-4 h-4" />
-                <p className="text-sm">{isoTimeFormat(item.time)}</p>
+                <ClockIcon className="w-4 h-4 text-primary" />
+                <p
+                  className={`text-sm ${
+                    selectedTime?.time === item.time
+                      ? "text-white"
+                      : "text-gray-800"
+                  }`}
+                >
+                  {isoTimeFormat(item.time)}
+                </p>
               </div>
             ))
           ) : (
