@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { CheckIcon, DeleteIcon, StarIcon } from "lucide-react";
 import Loading from "../../components/Loading";
 import Title from "../../components/admin/Title";
 import { kConverter } from "../../lib/kConverter";
 import toast from "react-hot-toast";
-import {  dummyShowsData } from "../../assets/assets";
+import { dummyShowsData } from "../../assets/assets";
 
 const AddShows = () => {
   const currency = import.meta.env.VITE_CURRENCY;
@@ -13,6 +14,17 @@ const AddShows = () => {
   const [dateTimeSelection, setDateTimeSelection] = useState({});
   const [dateTimeInput, setDateTimeInput] = useState("");
   const [showPrice, setShowPrice] = useState("");
+  // New movie form state
+  const [title, setTitle] = useState("");
+  const [overview, setOverview] = useState("");
+  const [trailerLink, setTrailerLink] = useState("");
+  const [voteAverage, setVoteAverage] = useState("");
+  const [runtimeInput, setRuntimeInput] = useState("");
+  const [genresInput, setGenresInput] = useState("");
+  const [releaseYear, setReleaseYear] = useState("");
+  const [language, setLanguage] = useState("");
+  const [posterPreview, setPosterPreview] = useState("");
+  const [backdropPreview, setBackdropPreview] = useState("");
 
   const fetchNowPlayingMovies = async () => {
     setNowPlayingMovies(dummyShowsData);
@@ -48,12 +60,202 @@ const AddShows = () => {
     fetchNowPlayingMovies();
   }, []);
 
+  const navigate = useNavigate();
+
+  // helpers
+  const toMinutes = (input) => {
+    if (!input) return 0;
+    // accept formats like '1h 43m' or plain minutes '103'
+    const hMatch = input.match(/(\d+)\s*h/);
+    const mMatch = input.match(/(\d+)\s*m/);
+    if (hMatch) {
+      const hrs = parseInt(hMatch[1], 10);
+      const mins = mMatch ? parseInt(mMatch[1], 10) : 0;
+      return hrs * 60 + mins;
+    }
+    const asNum = parseInt(input, 10);
+    return Number.isNaN(asNum) ? 0 : asNum;
+  };
+
+  const extractYouTubeId = (url) => {
+    if (!url) return "";
+    // common patterns
+    const vMatch = url.match(/[?&]v=([\w-]{11})/);
+    if (vMatch) return vMatch[1];
+    const shortMatch = url.match(/youtu\.be\/([\w-]{11})/);
+    if (shortMatch) return shortMatch[1];
+    const embedMatch = url.match(/embed\/([\w-]{11})/);
+    if (embedMatch) return embedMatch[1];
+    // fallback: try to extract last 11-char token
+    const maybe = url.split(/\W/).find((p) => p && p.length === 11);
+    return maybe || "";
+  };
+
+  const readFileAsDataURL = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const handlePosterChange = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const uploadUrl = `${window.location.protocol}//${window.location.hostname}:3000/api/upload`;
+    const t = toast.loading("Uploading poster...");
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch(uploadUrl, { method: "POST", body: fd });
+      if (!res.ok) {
+        const info = await res.json().catch(() => ({}));
+        throw new Error(info.error || "Upload failed");
+      }
+      const json = await res.json();
+      setPosterPreview(json.url);
+      toast.dismiss(t);
+      toast.success("Poster uploaded");
+    } catch (err) {
+      console.error(err);
+      toast.dismiss(t);
+      // fallback: use a local data URL preview so admin can continue
+      try {
+        const data = await readFileAsDataURL(f);
+        setPosterPreview(data);
+        toast.error(
+          "Upload failed — using local preview. Configure server Cloudinary to enable uploads."
+        );
+      } catch (rerr) {
+        console.error("Failed to create local preview", rerr);
+        toast.error("Failed to upload poster");
+      }
+    }
+  };
+
+  const handleBackdropChange = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const uploadUrl = `${window.location.protocol}//${window.location.hostname}:3000/api/upload`;
+    const t = toast.loading("Uploading backdrop...");
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch(uploadUrl, { method: "POST", body: fd });
+      if (!res.ok) {
+        const info = await res.json().catch(() => ({}));
+        throw new Error(info.error || "Upload failed");
+      }
+      const json = await res.json();
+      setBackdropPreview(json.url);
+      toast.dismiss(t);
+      toast.success("Backdrop uploaded");
+    } catch (err) {
+      console.error(err);
+      toast.dismiss(t);
+      // fallback to local data URL preview
+      try {
+        const data = await readFileAsDataURL(f);
+        setBackdropPreview(data);
+        toast.error(
+          "Upload failed — using local preview. Configure server Cloudinary to enable uploads."
+        );
+      } catch (rerr) {
+        console.error("Failed to create local backdrop preview", rerr);
+        toast.error("Failed to upload backdrop");
+      }
+    }
+  };
+
+  const handleAddMovie = () => {
+    // validation
+    const vote = Number(voteAverage);
+    if (
+      !posterPreview ||
+      !title ||
+      !overview ||
+      !trailerLink ||
+      voteAverage === "" ||
+      !runtimeInput ||
+      !genresInput ||
+      !releaseYear ||
+      !language
+    ) {
+      return toast.error(
+        "Please fill all required fields (poster, title, description, trailer, rating, duration, genre, year, language)"
+      );
+    }
+
+    if (isNaN(vote) || vote < 0 || vote > 10) {
+      return toast.error(
+        "Please provide a valid numeric rating between 0 and 10"
+      );
+    }
+
+    const trailerId = extractYouTubeId(trailerLink);
+    const runtime = toMinutes(runtimeInput);
+
+    const genres = genresInput
+      .split(",")
+      .map((g, idx) => ({ id: Date.now() + idx, name: g.trim() }))
+      .filter((g) => g.name);
+
+    const newMovie = {
+      _id: `${Date.now()}`,
+      id: Date.now(),
+      title: title,
+      overview: overview,
+      poster_path: posterPreview,
+      backdrop_path: backdropPreview || posterPreview,
+      genres,
+      casts: [],
+      release_date: `${releaseYear}-01-01`,
+      original_language: language,
+      tagline: "",
+      vote_average: Number(voteAverage),
+      vote_count: 0,
+      runtime: runtime,
+      trailer_id: trailerId,
+    };
+
+    try {
+      const existing = JSON.parse(localStorage.getItem("adminShows") || "[]");
+      existing.unshift(newMovie);
+      localStorage.setItem("adminShows", JSON.stringify(existing));
+      // update UI
+      setNowPlayingMovies((prev) => [newMovie, ...prev]);
+      toast.success("Movie added successfully");
+      // clear form
+      setTitle("");
+      setOverview("");
+      setTrailerLink("");
+      setVoteAverage("");
+      setRuntimeInput("");
+      setGenresInput("");
+      setReleaseYear("");
+      setLanguage("");
+      setPosterPreview("");
+      setBackdropPreview("");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save movie");
+    }
+  };
+
   // Render UI
   //   if (loading) return <Loading />;
 
   return (
     <>
       <Title text1="Add" text2="Shows" />
+      <div className="flex justify-end mt-3">
+        <button
+          onClick={() => navigate("/")}
+          className="px-3 py-1 rounded bg-red-800 text-white hover:bg-gray-700"
+        >
+          Home
+        </button>
+      </div>
 
       {/* Movies Section */}
       <p className="mt-10 text-lg font-medium">Now Playing Movies</p>
@@ -65,13 +267,13 @@ const AddShows = () => {
           <div className="group flex flex-wrap gap-4 mt-4 w-max">
             {nowPlayingMovies.map((movie) => (
               <div
-                key={movie.id}
+                key={movie._id || movie.id}
                 className={`relative max-w-40 cursor-pointer transition duration-300 ${
-                  selectedMovie === movie.id
+                  selectedMovie === (movie._id || movie.id)
                     ? "ring-2 ring-primary scale-105"
                     : "opacity-80 hover:opacity-100"
                 }`}
-                onClick={() => setSelectedMovie(movie.id)}
+                onClick={() => setSelectedMovie(movie._id || movie.id)}
               >
                 <div className="relative rounded-lg overflow-hidden">
                   <img
@@ -82,7 +284,10 @@ const AddShows = () => {
                   <div className="text-sm flex items-center justify-between p-2 bg-black/70 w-full absolute bottom-0 left-0">
                     <p className="flex items-center gap-1 text-gray-400">
                       <StarIcon className="w-4 h-4 text-primary fill-primary" />
-                      {movie.vote_average.toFixed(1)}
+                      {(isNaN(Number(movie.vote_average))
+                        ? 0
+                        : Number(movie.vote_average)
+                      ).toFixed(1)}
                     </p>
                     <p className="text-gray-300">
                       {kConverter(movie.vote_count)} Votes
@@ -90,7 +295,7 @@ const AddShows = () => {
                   </div>
                 </div>
 
-                {selectedMovie === movie.id && (
+                {selectedMovie === (movie._id || movie.id) && (
                   <div className="absolute top-2 right-2 flex items-center justify-center bg-primary h-6 w-6 rounded">
                     <CheckIcon
                       className="w-4 h-4 text-white"
@@ -171,13 +376,165 @@ const AddShows = () => {
           </ul>
         </div>
       )}
-        {/* Submit Button */}
-      <button
-        className="bg-primary text-white px-8 py-2 mt-6 rounded hover:bg-primary/90 transition-all cursor-pointer disabled:opacity-50"
-      >
-        Add Show
-      </button>
-   
+      {/* New Movie Form */}
+      <div className="mt-8 p-6 border border-gray-700 rounded-lg bg-black/20">
+        <h2 className="text-lg font-medium mb-4">Add New Movie</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Movie Poster (required)
+            </label>
+            <input type="file" accept="image/*" onChange={handlePosterChange} />
+            {posterPreview && (
+              <img
+                src={posterPreview}
+                alt="poster"
+                className="mt-2 rounded max-h-40"
+              />
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Backdrop Image (optional)
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleBackdropChange}
+            />
+            {backdropPreview && (
+              <img
+                src={backdropPreview}
+                alt="backdrop"
+                className="mt-2 rounded max-h-40"
+              />
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Movie Name (required)
+            </label>
+            <input
+              className="w-full p-2 rounded bg-transparent border border-gray-700"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Short Description / Plot (required)
+            </label>
+            <input
+              className="w-full p-2 rounded bg-transparent border border-gray-700"
+              value={overview}
+              onChange={(e) => setOverview(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              YouTube Trailer Link (required)
+            </label>
+            <input
+              className="w-full p-2 rounded bg-transparent border border-gray-700"
+              value={trailerLink}
+              onChange={(e) => setTrailerLink(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              User Rating (required)
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              step={0.1}
+              className="w-full p-2 rounded bg-transparent border border-gray-700"
+              value={voteAverage}
+              onChange={(e) => setVoteAverage(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Movie Duration (e.g., 1h 43m) (required)
+            </label>
+            <input
+              className="w-full p-2 rounded bg-transparent border border-gray-700"
+              value={runtimeInput}
+              onChange={(e) => setRuntimeInput(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Genre/Category (comma separated) (required)
+            </label>
+            <input
+              className="w-full p-2 rounded bg-transparent border border-gray-700"
+              value={genresInput}
+              onChange={(e) => setGenresInput(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Release Year (required)
+            </label>
+            <input
+              type="number"
+              min={1900}
+              max={2100}
+              className="w-full p-2 rounded bg-transparent border border-gray-700"
+              value={releaseYear}
+              onChange={(e) => setReleaseYear(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Language (e.g., EN) (required)
+            </label>
+            <input
+              className="w-full p-2 rounded bg-transparent border border-gray-700"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 flex gap-3">
+          <button
+            onClick={handleAddMovie}
+            className="bg-primary px-4 py-2 rounded"
+          >
+            Add Movie
+          </button>
+          <button
+            onClick={() => {
+              setTitle("");
+              setOverview("");
+              setTrailerLink("");
+              setVoteAverage("");
+              setRuntimeInput("");
+              setGenresInput("");
+              setReleaseYear("");
+              setLanguage("");
+              setPosterPreview("");
+              setBackdropPreview("");
+            }}
+            className="bg-gray-700 px-4 py-2 rounded"
+          >
+            Clear
+          </button>
+        </div>
+      </div>
     </>
   );
 };

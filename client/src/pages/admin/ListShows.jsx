@@ -3,6 +3,7 @@ import { dummyShowsData } from "../../assets/assets";
 import Loading from "../../components/Loading";
 import Title from "../../components/admin/Title";
 import { dateFormat } from "../../lib/dateFormat";
+import { useNavigate } from "react-router-dom";
 
 const ListShows = () => {
   const currency = import.meta.env.VITE_CURRENCY || "₹";
@@ -37,6 +38,7 @@ const ListShows = () => {
   useEffect(() => {
     getAllShows();
   }, []);
+  const navigate = useNavigate();
 
   return !loading ? (
     <>
@@ -70,6 +72,14 @@ const ListShows = () => {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="flex justify-end mt-3">
+        <button
+          onClick={() => navigate("/")}
+          className="px-3 py-1 rounded bg-red-800 text-white hover:bg-gray-700"
+        >
+          Home
+        </button>
       </div>
     </>
   ) : (

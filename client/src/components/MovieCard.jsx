@@ -4,18 +4,25 @@ import { useNavigate } from "react-router-dom";
 import timeFormat from "../lib/timeFormat";
 // import timeFormat from "../lib/timeFormat";
 
-const MovieCard = ({ movie }) => {
+const MovieCard = ({ movie, onSelect }) => {
   const navigate = useNavigate();
   const image_base_url = "https://image.tmdb.org/t/p/original"; // ✅ define locally
+
+  const computeImageSrc = (path) => {
+    if (!path) return "";
+    if (path.startsWith("http") || path.startsWith("data:")) return path;
+    return image_base_url + path;
+  };
 
   return (
     <div className="flex flex-col justify-between p-3 bg-gray-800 rounded-2xl hover:-translate-y-1 transition duration-300 w-66">
       <img
         onClick={() => {
+          if (typeof onSelect === "function") onSelect();
           navigate(`/movies/${movie._id}`);
           scrollTo(0, 0);
         }}
-        src={image_base_url + movie.backdrop_path} // ✅ use base URL here
+        src={computeImageSrc(movie.backdrop_path)}
         alt={movie.title}
         className="rounded-lg h-52 w-full object-cover object-right-bottom cursor-pointer"
       />
@@ -34,6 +41,7 @@ const MovieCard = ({ movie }) => {
       <div className="flex items-center justify-between mt-4 pb-3">
         <button
           onClick={() => {
+            if (typeof onSelect === "function") onSelect();
             navigate(`/movies/${movie._id}`);
             scrollTo(0, 0);
           }}

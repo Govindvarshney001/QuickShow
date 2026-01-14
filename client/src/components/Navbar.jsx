@@ -5,16 +5,27 @@ import { MenuIcon, SearchIcon, TicketPlus, XIcon } from "lucide-react";
 import { useClerk, UserButton, useUser } from "@clerk/clerk-react";
 // import { useAppContext } from "../context/AppContext";
 
+import AdminAuthModal from "./AdminAuthModal";
+import SearchModal from "./SearchModal";
+
 function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [showAdminAuth, setShowAdminAuth] = useState(false);
   // const { favoriteMovies } = useAppContext();
   const { user } = useUser();
   const navigate = useNavigate();
-  const {openSignIn} = useClerk();
+  const { openSignIn } = useClerk();
+  const [showSearch, setShowSearch] = useState(false);
 
   return (
     <div className="fixed top-0 left-0 z-50 w-full flex items-center justify-between px-6 md:px-16 1g:px-36 py-5">
-      <Link>
+      <Link
+        onClick={() => {
+          scrollTo(0, 0);
+          setIsOpen(false);
+        }}
+        to="/"
+      >
         <img src={assets.logo} className="w-36 h-auto" alt="" />
       </Link>
       <div
@@ -50,20 +61,11 @@ function Navbar() {
             scrollTo(0, 0);
             setIsOpen(false);
           }}
-          to="/"
+          to="/my-bookings"
         >
-          Theaters
+          Bookings
         </Link>
-        <Link
-          onClick={() => {
-            scrollTo(0, 0);
-            setIsOpen(false);
-          }}
-          to="/"
-        >
-          Releases
-        </Link>
-        {(
+        {
           <Link
             onClick={() => {
               scrollTo(0, 0);
@@ -73,11 +75,24 @@ function Navbar() {
           >
             Favorites
           </Link>
-        )}
+        }
+        <button
+          onClick={() => {
+            scrollTo(0, 0);
+            setIsOpen(false);
+            setShowAdminAuth(true);
+          }}
+          className="cursor-pointer"
+        >
+          Admin
+        </button>
       </div>
 
       <div className="flex items-center gap-8">
-        <SearchIcon className="max-md:hidden w-6 h-6 cursor-pointer" />
+        <SearchIcon
+          className="max-md:hidden w-6 h-6 cursor-pointer"
+          onClick={() => setShowSearch(true)}
+        />
         {!user ? (
           <button
             onClick={openSignIn}
@@ -102,6 +117,11 @@ function Navbar() {
         className="max-md:ml-4 md:hidden w-8 h-8 cursor-pointer"
         onClick={() => setIsOpen(!isOpen)}
       />
+      <AdminAuthModal
+        open={showAdminAuth}
+        onClose={() => setShowAdminAuth(false)}
+      />
+      <SearchModal open={showSearch} onClose={() => setShowSearch(false)} />
     </div>
   );
 }

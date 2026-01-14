@@ -6,6 +6,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { dummyDashboardData } from "../../assets/assets";
 import Loading from "../../components/Loading";
 import Title from "../../components/admin/Title";
@@ -57,9 +58,19 @@ const Dashboard = () => {
     loadDummyData();
   }, []);
 
+  const navigate = useNavigate();
+
   return !loading ? (
     <>
       <Title text1="Admin" text2="Dashboard" />
+      <div className="flex justify-end mt-3">
+        <button
+          onClick={() => navigate("/")}
+          className="px-3 py-1 rounded bg-red-800 text-white hover:bg-gray-700"
+        >
+          Home
+        </button>
+      </div>
 
       <div className="relative flex flex-wrap gap-4 mt-6">
         <BlurCircle top="-100px" left="0" />
